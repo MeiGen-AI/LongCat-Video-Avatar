@@ -1,0 +1,2278 @@
+
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>LongCat-Video-Avatar</title>
+        <meta name="description" content="LongCat-Video-Avatar is a infinite long sequence audio-driven video editing model.">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#000000">
+
+
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1.9.1/css/academicons.min.css">
+
+        <!-- Google tag (gtag.js) -->
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-9R6G4R5JJQ"></script>
+        <script>
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'G-9R6G4R5JJQ');
+        </script>
+
+        <style>
+.text-prompt-box {
+    width: 100%;
+    /* 让文字区域自动撑满剩余高度 */
+    flex: 1; 
+    display: flex;
+    align-items: center; /* 垂直居中，如果文字很长想靠上，改成 flex-start */
+    justify-content: center; /* 水平居中，如果想靠左，改成 flex-start */
+    padding: 24px;
+    background: transparent;
+    color: #e0e0e0; /* 字体颜色：灰白 */
+    font-family: "Courier New", Courier, monospace; /* 稍微带点代码感，或者保留原来的 Outfit */
+    font-size: 15px;
+    line-height: 1.5;
+    text-align: center; /* 文字居中对齐 */
+    overflow-y: auto; /* 如果文字太长，允许滚动 */
+    box-sizing: border-box;
+}
+
+/* 针对右侧 Audio 下方的小文本框微调 */
+.text-prompt-box.small {
+    padding: 12px 16px;
+    font-size: 13px;
+    border-top: 1px solid #333; /* 分割线 */
+    align-items: center; 
+    min-height: 50px; /* 保证最少有点高度 */
+}
+/* 让左右两块横向排列 */
+.identity-container {
+    display: flex;
+    justify-content: space-between;
+    gap: 40px; /* 中间留出 40px 的空隙 */
+    align-items: flex-start; /* 顶部对齐 */
+}
+
+/* 每一半占据 1 份空间 (即各占 50% 减去间隙) */
+.identity-half {
+    flex: 1;
+    min-width: 0; /* 防止内容撑破 flex 容器 */
+}
+
+/* 针对原来 text 的微调，让标题在小格子里居中好看点 */
+.identity-half .text {
+    text-align: center;
+    margin-bottom: 24px;
+}
+
+/* 【重要】响应式处理：屏幕小于 1024px 时变回上下排列 */
+@media (max-width: 1024px) {
+    .identity-container {
+        flex-direction: column;
+        gap: 60px;
+    }
+}
+
+
+/* Carousel Styles */
+.carousel-container {
+    position: relative;
+    width: 100%;
+    padding: 40px 0 120px 0;}
+
+.carousel-wrapper {
+    overflow: hidden;
+    width: 100%;
+}
+
+.carousel-track {
+    display: flex;
+    transition: transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    padding: 20px 0;
+    align-items: center;
+}
+
+.carousel-item {
+    flex-shrink: 0;
+    /* 1. 调大基础宽度，从 45% 改为 60%，让中间显大 */
+    width: 60%; 
+    /* 2. 减小间距，让它们靠得更紧凑 */
+    margin: 0 1%; 
+    transition: all 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    opacity: 0.4;
+    /* 3. 这里的 scale 改小，比如 0.65，让两边看起来更小 */
+    transform: scale(0.65); 
+    filter: blur(2px);
+}
+.carousel-item.active {
+    opacity: 1;
+    /* 4. 激活状态保持原始大小（因为基础宽度已经变大了，所以看起来很大） */
+    transform: scale(1.05);
+    filter: blur(0);
+    z-index: 2;
+    /* 5. 增加阴影强调 */
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5); 
+}
+.carousel-item .video-player {
+    border-radius: 16px;
+    overflow: hidden;
+    background: #222;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+}
+
+.carousel-item.active .video-player {
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+}
+
+.carousel-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255, 255, 255, 0.9);
+    border: none;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    font-size: 28px;
+    cursor: pointer;
+    z-index: 10;
+    transition: all 0.3s;
+    color: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.carousel-nav:hover {
+    background: #fff;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+    transform: translateY(-50%) scale(1.1);
+}
+
+.carousel-nav.prev {
+    left: 20px;
+}
+
+.carousel-nav.next {
+    right: 20px;
+}
+
+.carousel-caption {
+    /* --- 核心修改开始 --- */
+    
+    /* 1. 宽度设为 60%，跟你的 .carousel-item 宽度保持一致 */
+    width: 60%; 
+    
+    /* 2. 使用绝对定位 + transform 让这个盒子水平居中 */
+    left: 50%;
+    transform: translateX(-50%);
+    
+    /* 3. 盒子居中后，里面的文字设为左对齐，它就会自然紧贴视频左边缘 */
+    text-align: left;
+    
+    /* 4. 去掉之前的 padding，现在不需要了 */
+    padding: 0;
+    
+    /* --- 核心修改结束 --- */
+
+    /* 高度位置：数字越大越靠上，越小越靠下 */
+    bottom: 40px; 
+
+    /* 其他保持不变 */
+    position: absolute;
+    z-index: 20;
+    pointer-events: none;
+}
+
+.carousel-caption p {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.9); /* 稍微降低一点纯白度，更柔和 */
+    line-height: 1.5;
+    margin: 0;
+    opacity: 0;
+    transition: opacity 0.6s;
+    /* 可选：因为现在是深色背景，可以去掉文字阴影，显得更干净 */
+    /* text-shadow: 0 2px 4px rgba(0,0,0,0.8); */ 
+}
+/* 调整 Dots 的位置，确保在 Caption 下面 */
+.carousel-dots {
+    display: flex;
+    justify-content: center;
+    gap: 12px; /* 圆点间距稍微拉大一点点 */
+    position: absolute;
+    /* 修改这里：固定在最底部 */
+    bottom: 25px; 
+    left: 0;
+    width: 100%;
+    z-index: 21;
+}
+.carousel-caption p.active {
+    opacity: 1;
+}
+
+/* .carousel-dots {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 20px;
+} */
+
+.carousel-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.carousel-dot.active {
+    background: #fff;
+    width: 30px;
+    border-radius: 5px;
+}
+
+@media (max-width: 640px) {
+    .carousel-item {
+        width: 80%;
+        margin: 0 10%;
+    }
+    
+    .carousel-nav {
+        width: 40px;
+        height: 40px;
+        font-size: 24px;
+    }
+    
+    .carousel-nav.prev {
+        left: 10px;
+    }
+    
+    .carousel-nav.next {
+        right: 10px;
+    }
+    
+    .carousel-caption {
+        padding: 0 5%;
+    }
+    
+    .carousel-caption p {
+        font-size: 14px;
+    }
+}
+
+            @font-face {
+                font-family: 'Raleway';
+                font-style: normal;
+                font-weight: 600;
+                font-display: block;
+                src: url(assets/fonts/raleway_normal_600.woff2) format('woff2');
+                unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+            }
+            @font-face {
+                font-family: 'Outfit';
+                font-style: normal;
+                font-weight: 100 900;
+                font-display: block;
+                src: url(assets/fonts/outfit.woff2) format('woff2');
+                unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+            }
+
+            * {
+                box-sizing: border-box;
+            }
+
+            :root {
+                --intro-scale: 0
+            }
+
+            body {
+                margin: 0;
+                font-family: "Outfit", sans-serif;
+                background: #28282d;
+                color: #fff;
+            }
+
+            .flex {
+                display: flex;
+                gap: 24px;
+                align-items: stretch;
+                justify-content: stretch;
+            }
+            .flex-center {
+                align-items: center;
+            }
+
+            #logo {
+                position: absolute;
+                top: 0;
+                right: calc(50vw - min(45vw, 1600px / 2));
+                z-index: 1;
+                background: rgb(60, 140, 255);
+                padding: 32px 8px 8px 8px;
+                border-radius: 0 0 8px 8px;
+            }
+            #logo svg {
+                width: 40px;
+                height: 40px;
+            }
+
+
+            section {
+                border-top: 1px solid #333;
+                padding: 48px calc(50vw - min(45vw, 1600px / 2));
+            }
+
+            .text {
+                margin-bottom: 50px;
+            }
+
+            #intro {
+                text-align: center;
+                height: 100vh;
+                padding: 0;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                border: none;
+            }
+
+            #intro .content {
+                top: 0;
+                left: 0;
+                position: absolute;
+                width: 100%;
+                height: 100%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            #intro .background-video {
+                width: calc(100vw * (1 - var(--intro-scale)) + min(90vw, 1600px) * var(--intro-scale));
+                height: calc(100vh * (1 - var(--intro-scale)) + 90vh * var(--intro-scale));
+                border-radius: calc(0px * (1 - var(--intro-scale)) + 16px * var(--intro-scale));
+                overflow: hidden;
+            }
+            #intro video {
+                width: calc(100% + 20px);
+                height: calc(100% + 20px);
+                margin-left: -10px;
+                margin-top: -10px;
+                object-fit: cover;
+                filter: brightness(50%) blur(10px);
+            }
+
+            #intro h1 {
+                font-size: 60px;
+                margin: 100px 0 20px 0;
+                font-family: "Raleway", sans-serif;
+                font-optical-sizing: auto;
+                font-weight: 600;
+                font-style: normal;
+            }
+
+            #intro h2 {
+                margin: 20px 0 40px 0;
+                font-size: 20px;
+                font-weight: 200;
+            }
+
+            #intro h3 {
+                margin: 20px 0 40px 0;
+                font-size: 40px;
+                font-weight: 200;
+            }
+
+            #t2v {
+                border: none;
+            }
+            #t2v .text:not(:first-of-type) {
+                margin-top: 48px;
+            }
+            #t2v .feature-video {
+                aspect-ratio: 21 / 9;
+            }
+            .feature-video {
+                position: relative;
+            }
+            .feature-video .cover {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                height: 100%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: rgba(0,0,0,0.5);
+                backdrop-filter: blur(10px);
+                text-align: center;
+                transition: backdrop-filter 0.5s;
+                cursor: pointer;
+                z-index: 1;
+            }
+            .feature-video .button {
+                width: 64px;
+                height: 64px;
+                border-radius: 32px;
+                background-color: #fff;
+                background-image: url(assets/icons/play.svg);
+                background-position: center;
+                background-repeat: no-repeat;
+                box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+                margin: 32px auto 0 auto;
+                transition: box-shadow 0.5s;
+            }
+            .feature-video .cover:hover .button {
+                box-shadow: 0 0 35px rgba(0, 0, 0, 0.5);
+            }
+            .feature-video video {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+            }
+            .feature-video video.final-video {
+                object-fit: contain;
+                opacity: 0;
+            }
+
+            h1 {
+                font-size: 32px;
+                font-weight: 400;
+                margin: 0;
+            }
+            p {
+                font-size: 16px;
+                color: #b9bbc6;
+                line-height: 25px;
+                font-weight: 300;
+            }
+
+            .grid {
+                display: grid;
+                grid-gap: 16px;
+                grid-template-columns: 1fr 1fr 1fr;
+            }
+            .grid2 {
+                display: grid;
+                grid-gap: 16px;
+                grid-template-columns: 1fr 1fr;
+            }
+            .grid3 {
+                grid-template-columns: repeat(3, 1fr);
+            }
+            .grid4 {
+                grid-template-columns: repeat(4, 1fr);
+            }
+            .grid4r {
+                display: grid;
+                grid-gap: 16px;
+                grid-template-columns: 1fr 1fr 1fr 1fr;
+            }
+            .grid5 {
+                grid-template-columns: repeat(5, 1fr);
+            }
+            /* .video-player {
+                width: 100%;
+                display: flex;
+                justify-content: stretch;
+                align-items: stretch;
+                position: relative;
+                border-radius: 16px;
+                overflow: hidden;
+                background: #222;
+            } */
+            .video-player {
+                width: 100%;
+                display: flex;
+                flex-direction: column; /* Stack children vertically */
+                align-items: stretch;
+                position: relative;
+                border-radius: 16px;
+                overflow: hidden;
+                background: #222;
+                gap: 8px; /* Space between video and caption */
+            }
+
+            .video-player video {
+                width: 100%;
+                display: block;
+                flex-shrink: 0; /* Prevent video from shrinking */
+            }
+
+            .video-caption {
+                padding: 0 12px 12px;
+                color: #fff;
+                font-size: 14px;
+                text-align: center;
+                line-height: 1.4;
+            }
+
+            .video-caption {
+                text-align: center;
+                font-size: 16px;
+                color: #666;
+                border-top: 1px solid #ddd;
+                padding: 10px 0;
+            }
+            video {
+                width: 100%;
+                object-fit: cover;
+            }
+            .span12 {
+                grid-row: span 2;
+            }
+            .span22 {
+                grid-column: span 2;
+                grid-row: span 2;
+            }
+            .span21 {
+                grid-column: span 2;
+            }
+            #i2v .author {
+                position: absolute;
+                left: 16px;
+                top: 16px;
+                font-size: 10px;
+                padding: 4px 8px;
+                border-radius: 4px;
+                background: rgba(0,0,0,0.5);
+                opacity: 0;
+                transition: opacity 0.5s;
+            }
+            #i2v .video-player:hover .author {
+                opacity: 1;
+            }
+            #i2v2 {
+                padding-top: 0;
+                border: none;
+            }
+            #i2v2 .page-control {
+                margin-bottom: 48px;
+            }
+            #i2v2 .page-content .video-player {
+                aspect-ratio: 448 / 800;
+            }
+
+            .page-select {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                gap: 4px;
+                margin: 8px 0 16px 0;
+            }
+            .page-select > div {
+                padding: 8px 16px;
+                border-radius: 100px;
+                cursor: pointer;
+                transition: background-color 0.5s, color 0.5s;
+                background: rgba(0,0,0,0.25);
+            }
+            .page-select > div:hover {
+                background-color: rgba(0,0,0,0.5);
+            }
+            .page-select > div[selected=true] {
+                background-color: #fff;
+                color: #000;
+            }
+            .page-content > div:not([selected=true]) {
+                display: none;
+            }
+
+            #long {
+                background: linear-gradient(75deg, #524037, #282025);
+            }
+            #long .text {
+                width: 30%;
+                flex-shrink: 0;
+            }
+            #shots {
+                padding-top: 0;
+                padding-bottom: 0;
+                background: linear-gradient(180deg, #222a2d, #121a1d);
+            }
+            #singer {
+                padding-top: 0;
+                padding-bottom: 0;
+                background: rgba(0,0,0,0.5);
+            }
+            
+            #podcast {
+                padding-top: 0;
+                padding-bottom: 0;
+                background: rgba(0, 0, 0, 0.648);
+            }
+            #sales {
+                padding-top: 0;
+                padding-bottom: 0;
+                background: rgba(0, 0, 0, 0.407);
+            }
+            #multiperson {
+                padding-top: 0;
+                padding-bottom: 0;
+                background: rgba(0, 0, 0, 0.302);
+            }
+
+            #shots video {
+                aspect-ratio: 872 / 480;
+            }
+            #shots .main {
+                position: sticky;
+                top: 0;
+                max-height: 100vh;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                padding: 40px 0;
+            }
+            #shots > .flex {
+                align-items: stretch;
+            }
+            .shots-list {
+                padding: 64px 0;
+                width: 30%;
+                min-width: 300px;
+                flex-shrink: 0;
+                position: relative;
+                scrollbar-width: none;
+            }
+            .shots-list > div {
+                display: flex;
+                align-items: center;
+                gap: 16px;
+                border-radius: 8px;
+                padding-right: 16px;
+                cursor: pointer;
+                white-space: nowrap;
+                transition: background-color 0.5s;
+            }
+            .shots-list p {
+                font-size: 14px;
+            }
+            .shots-list > div:not(:last-of-type) {
+                margin-bottom: 8px;
+            }
+            .shots-list > div[selected] {
+                background:rgba(0, 0, 0, 0.5)
+            }
+            .shots-list > div:hover {
+                background:rgba(255, 255, 255, 0.2)
+            }
+            .shots-list img {
+                width: 80px;
+                border-radius: 8px;
+                aspect-ratio: 872 / 480;
+            }
+            .shots-list h6 {
+                margin: 4px 0 0 0;
+            }
+            .shots-list p {
+                margin: 0;
+            }
+
+            @media (min-height: 1024px) {
+                #shots {
+                    padding-top: 0;
+                    padding-bottom: 0;
+                }
+                .shots-list {
+                    max-height: 900px;
+                    overflow: scroll;
+                }
+            }
+
+            #audio, #avatar {
+                background: #202820;
+            }
+
+            #identity {
+                background: #2f2820;
+            }
+
+            #real-time {
+                background: #000;
+            }
+
+
+            .audio-control {
+                transition: transform 0.5s, box-shadow 0.5s;
+            }
+            .audio-button {
+                width: 64px;
+                height: 64px;
+                border-radius: 32px;
+                position: absolute;
+                right: 32px;
+                bottom: 32px;
+                transition: box-shadow 0.5s, opacity 0.5s;
+                cursor: pointer;
+                background-color: #fff;
+                background-position: center;
+                background-repeat: no-repeat;
+                background-size: 32px;
+                background-image: url(assets/icons/mute.svg);
+                box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+                z-index: 2;
+            }
+            body[muted=false] .audio-button {
+                background-image: url(assets/icons/unmute.svg);
+            }
+            @media (min-width: 640px) {
+                body[muted=false] .audio-control:hover {
+                    transform: scale(1.05);
+                    z-index: 1;
+                    box-shadow: 0 0 32px rgba(0,0,0,0.8);
+                }
+                .audio-control .audio-button {
+                    opacity: 0;
+                }
+                .audio-control:hover .audio-button {
+                    opacity: 1;
+                }
+                .audio-control .audio-button:hover {
+                    background-color: #fff;
+                    border: none;
+                    box-shadow: 0 5px 10px rgba(0,0,0,0.5);
+                }
+                .audio-button-mobile {
+                    display: none;
+                }
+
+                .mobile-only {
+                    display: none !important;
+                }
+            }
+            .duration-indicator {
+                position: relative;
+            }
+            .duration-indicator .bar {
+                position: absolute;
+                bottom: 16px;
+                left: 32px;
+                width: calc(100% - 64px);
+                height: 4px;
+                border-radius: 100px;
+                background: rgba(255,255,255,0.5);
+                overflow: hidden;
+                transition: opacity 0.5s;
+            }
+            .duration-indicator .barinner {
+                height: 100%;
+                width: 0;
+                background: #fff;
+            }
+
+            .duration-indicator .time {
+                position: absolute;
+                right: 32px;
+                bottom: 24px;
+                transition: opacity 0.5s;
+                font-size: 14px;
+            }
+
+            #super-resolution {
+                background: linear-gradient(75deg, #282838, #222233)
+            }
+            #super-resolution .text {
+                max-width: 30%;
+            }
+
+            .video-slider {
+                width: 100%;
+                aspect-ratio: 16 / 9;
+                background: #222;
+                border-radius: 16px;
+                overflow: hidden;
+                position: relative;
+            }
+            .video-slider .video1,
+            .video-slider .video2 {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                overflow: hidden;
+                background: #222;
+            }
+            .video-slider .video1 {
+                width: 50%;
+                border-right: 3px solid #fff;
+                z-index: 2;
+            }
+            .video-slider .button {
+                width: 64px;
+                height: 64px;
+                border-radius: 32px;
+                background-color: #fff;
+                background-image: url(assets/icons/drag.svg);
+                background-position: center;
+                background-repeat: no-repeat;
+                position: absolute;
+                transition: box-shadow 0.5s, opacity 0.5s;
+                z-index: 3;
+                opacity: 0.5;
+            }
+            .video-slider:hover .button {
+                opacity: 1;
+            }
+            .video-slider .button:hover {
+                box-shadow: 0 2px 15px rgba(0,0,0,0.5);
+            }
+            .video-slider .slider {
+                background-image: url(assets/icons/drag.svg);
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                cursor: grab;
+            }
+            .video-slider video {
+                width: auto;
+                height: 100%;
+            }
+            .video-slider .label {
+                display: inline-block;
+                position: absolute;
+                top: 32px;
+                font-size: 14px;
+                font-weight: 600;
+                background-color: #fff;
+                border-radius: 4px;
+                opacity: 0.75;
+                color: #000;
+                padding: 4px 8px;
+                user-select: none;
+            }
+            .video-slider .video1 .label {
+                left: 32px
+            }
+            .video-slider .video2 .label {
+                right: 32px
+            }
+            .video-slider .fullscreen {
+                background-image: url(assets/icons/fullscreen.svg);
+                opacity: 0;
+                bottom: 32px;
+                right: 32px;
+            }
+            body[fullscreen] .video-slider .fullscreen {
+                background-image: url(assets/icons/fullscreen-exit.svg);
+            }
+
+            #camera-control .grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+            #camera-control h6 {
+                margin: 8px 0;
+                z-index: 1;
+            }
+            #camera-control .video-player,
+            #world-explore .video-player {
+                aspect-ratio: 16 / 9;
+            }
+
+            #camera-control {
+                background: linear-gradient(90deg, #252820, #102028);
+            }
+
+            #world-explore {
+                background: linear-gradient(90deg, #252820, #152028);
+            }
+            
+            #synthetic {
+                padding-bottom: 80px;
+                background: linear-gradient(#102028, #000);
+            }
+
+            #synthetic .flex {
+                gap: 16px;
+            }
+
+            #team {
+                background-color: #000;
+                text-align: center;
+                padding: 80px 16px 160px 16px;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                border: none;
+            }
+            #team .content {
+                width: 100%;
+            }
+            #team .flex {
+                justify-content: center;
+                flex-wrap: wrap;
+            }
+            #team h3 {
+                font-size: 20px;
+                font-weight: 400;
+                margin-top: 80px;
+                margin-bottom: 8px;
+            }
+            #team h4 {
+                font-size: 17px;
+                font-weight: 400;
+                margin-top: 32px;
+                margin-bottom: 8px;
+            }
+            #team h6 {
+                font-weight: 200;
+                margin: 0;
+                opacity: 0.8;
+            }
+            #team ul {
+                padding: 0;
+                margin: 0;
+                min-width: 250px;
+            }
+            #team li,
+            #team p {
+                font-size: 17px;
+                font-weight: 200;
+                line-height: 28px;
+                list-style-type: none;
+                text-wrap: balance;
+            }
+            #team p {
+                max-width: 1600px;
+                color: #fff;
+                margin: 16px auto 0 auto;
+            }
+            #team p span {
+                text-wrap: nowrap;
+            }
+
+            a.external {
+                border-radius: 100px;
+                text-decoration: none;
+                padding: 8px 16px;
+                cursor: pointer;
+                transition: background-color 0.5s, color 0.5s;
+                color: #b9bbc6;
+                font-size: 14px;
+                margin-top: 8px;
+                margin-bottom: -24px;
+                display: inline-block;
+                background: rgba(0,0,0,0.3);
+            }
+            a.external:hover {
+                background: rgba(255,255,255,1) !important;
+                color: #000;
+            }
+            #real-time a.external {
+                background: rgba(255,255,255,0.1);
+            }
+            #shots a.external {
+                margin-bottom: 0;
+            }
+
+            .paper-button {
+                padding-right: 16px;
+                border-radius: 8px;
+                color: #fff;
+                background-color: rgba(128,128,128,0.3);
+                cursor: pointer;
+                transition: background-color 0.5s;
+                text-decoration: none;
+                display: inline-flex;
+                align-items: center;
+                overflow: hidden;
+            }
+
+            .paper-button .icon {
+                box-sizing: content-box;
+                padding: 8px;
+                background-color: rgba(255,255,255,0.7);
+                margin-right: 16px;
+                transition: background-color 0.5s;
+            }
+
+            .paper-button:hover {
+                background-color: #fff;
+                color: #000;
+            }
+            .paper-button:hover .icon {
+                background-color: #fff;
+            }
+
+            @media (max-width: 640px) {
+                #intro h1 {
+                    font-size: 64px;
+                }
+                #intro .background-video {
+                    width: calc(100vw * (1 - var(--intro-scale)) + (100vw - 32px) * var(--intro-scale));
+                }
+
+                h1 {
+                    font-size: 24px;
+                }
+
+                section {
+                    padding: 32px 16px;
+                    position: relative;
+                }
+
+                .grid {
+                    gap: 4px;
+                }
+                .flex {
+                    gap: 4px !important;
+                }
+
+                .flex-mobile {
+                    display: block;
+                }
+
+                #t2v .feature-video {
+                    aspect-ratio: 1;
+                    max-height: calc(100vh - 64px);
+                }
+
+                #long .text,
+                #super-resolution .text {
+                    width: 100%;
+                    max-width: 100%;
+                }
+                #shots {
+                    padding: 32px 16px;
+                }
+                #shots .main {
+                    position: relative;
+                    padding: 0 0 16px 0;
+                }
+                #shots .shots-list {
+                    display: flex;
+                    overflow-x: scroll;
+                    gap: 4px;
+                    width: 100vw;
+                    margin: 0 0 0 -16px;
+                    padding: 0 16px;
+                    scroll-snap-type: x mandatory;
+                }
+                #shots .shots-list > div {
+                    scroll-snap-align: start;
+                    scroll-margin: 16px;
+                }
+
+                .grid:not(.grid-noslide) {
+                    display: flex;
+                    overflow-x: scroll;
+                    width: 100vw;
+                    margin-left: -16px;
+                    padding: 0 16px;
+                    scroll-snap-type: x mandatory;
+                    scrollbar-width: none;
+                }
+                .grid:not(.grid-noslide) > * {
+                    width: calc(100vw - 64px);
+                    max-height: calc(100vh - 64px);
+                    flex-shrink: 0;
+                    scroll-snap-align: center;
+                    scroll-snap-stop: always;
+                    scroll-margin: 16px;
+                }
+                .grid:not(.grid-noslide) .video-player:not(:first-of-type),
+                .grid:not(.grid-noslide) *:not(:first-of-type) .video-player {
+                    border-top-left-radius: 0;
+                    border-bottom-left-radius: 0;
+                }
+                .grid:not(.grid-noslide) .video-player:not(:last-of-type),
+                .grid:not(.grid-noslide) *:not(:last-of-type) .video-player {
+                    border-top-right-radius: 0;
+                    border-bottom-right-radius: 0;
+                }
+
+                .audio-control .audio-button {
+                    display: none;
+                }
+                .audio-button-mobile {
+                    right: 48px;
+                    bottom: 48px;
+                }
+                section:has(a.external) .audio-button-mobile {
+                    bottom: 96px;
+                }
+
+                .duration-indicator .bar {
+                    left: 16px;
+                    bottom: 8px;
+                    width: calc(100% - 32px);
+                }
+                .duration-indicator .time {
+                    right: 16px;
+                    bottom: 16px;
+                }
+
+                #synthetic .grid {
+                    border-radius: 16px;
+                    overflow: hidden;
+                }
+                #synthetic .video-player {
+                    border-radius: 0;
+                }
+                #synthetic .flex > div:last-child {
+                    display: none;
+                }
+
+                section:has(a.external) {
+                    padding-bottom: 80px !important;
+                }
+                a.external {
+                    position: absolute;
+                    bottom: 48px;
+                    left: 16px;
+                    width: calc(100vw - 32px);
+                    text-align: center;
+                }
+
+                #shots a.external {
+                    position: inherit;
+                    margin: 8px 0;
+                }
+                #shots {
+                    padding-bottom: 24px !important;
+                }
+
+                .desktop-only {
+                    display: none !important;
+                }
+
+                #synthetic a.external {
+                    background: rgba(255,255,255,0.1);
+                }
+
+                .page-select {
+                    justify-content: space-evenly;
+                    overflow: scroll;
+                    margin-left: -16px;
+                    margin-right: -16px;
+                    padding-left: 16px;
+                    padding-right: 16px;
+                    scrollbar-width: none;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <!-- <div id="logo">
+            <svg viewBox="1.37 0 1198.25 1051.64" xmlns="http://www.w3.org/2000/svg"><path d="m206.82 943.8-205.45 52.74v-941.44l205.45 53.14z" fill="#fff"/><path d="m532.79 972.14-205.44 53.13v-554.55l205.44 53.13z" fill="#fff"/><path d="m667.02 388.86 205.84-53.14v554.55l-205.84-53.13z" fill="#fff"/><path d="m1199.62 998.9-205.84 52.74v-1051.64l205.84 53.13z" fill="#fff"/></svg>
+        </div> -->
+        <section id="intro">
+            <div class="background-video">
+                <video muted loop playsinline preload="none" src="videos/first/test5.mp4"></video>
+            </div>
+            <div class="content">
+                <div class="text">
+                    <h3>MeiGen-LongCat-Video-Avatar</h3>
+                    <h1>LongCat-Video-Avatar</h1>
+                    <div class="is-size-5 publication-authors">
+                        Meituan LongCat Team
+                        <!-- <span class="author-block">
+                            <a href="https://scholar.google.com/citations?user=JrdZbTsAAAAJ&hl=en">Shaoshu Yang</a><sup>1,2,3*</sup>,
+                          </span>
+                        <span class="author-block">
+                          <a href="https://scholar.google.com/citations?user=4X3yLwsAAAAJ&hl=en">Zhe Kong</a><sup>4,2,5*</sup>,
+                        </span>
+                        <span class="author-block">
+                            <a href="https://scholar.google.com.hk/citations?user=lFkCeoYAAAAJ&hl=en">Feng Gao</a><sup>2*</sup>,
+                        </span>
+                        <span class="author-block">
+                            <a href="">Meng Cheng</a><sup>2*</sup>,
+                        </span>
+                        <span class="author-block">
+                          <a href="">Xiangyu Liu</a><sup>6, 2, 1*</sup>,
+                        </span>
+                        <span class="author-block">
+                          <a href="https://scholar.google.com/citations?user=a_zSeVEAAAAJ&hl=en">Yong Zhang</a><sup>2<i class="fas fa-envelope" style="margin-left: 5px; color: #555;"></i></sup>,
+                        </span>
+                        <span class="author-block">
+                          <a href="https://scholar.google.com/citations?user=W1ZXjMkAAAAJ">Zhuoliang Kang</a><sup>2</sup>,
+                        </span>
+                        <span class="author-block">
+                            <a href="https://whluo.github.io/">Wenhan Luo</a><sup>5</sup>,
+                          </span>
+                        <span class="author-block">
+                          <a href="https://openreview.net/profile?id=~Xunliang_Cai1">Xunliang Cai</a><sup>2</sup>,
+                        </span>
+                        <span class="author-block">
+                          <a href="https://scholar.google.com/citations?user=ayrg9AUAAAAJ&hl=en">Ran He</a><sup>1.3<i class="fas fa-envelope" style="margin-left: 5px; color: #555;"></i></sup>
+                        </span>
+                        <span class="author-block">
+                            <a href="https://scholar.google.com/citations?user=JXV5yrZxj5MC">Xiaoming Wei</a><sup>2</sup>,
+                          </span> -->
+                    </div>
+                    <br>
+                    <!-- <div class="is-size-5 publication-authors">
+                        <span class="author-block"><sup>1</sup>School of Artificial Intelligence, University of Chinese Academy of Sciences,</span>
+                        <span class="author-block"><sup>2</sup>Meituan,</span>
+                        <br>
+                        <span class="author-block"><sup>3</sup>New Laboratory of Pattern Recognition (NLPR), CASIA,</span>
+                        <span class="author-block"><sup>4</sup>Shenzhen Campus of Sun Yat-sen University,</span>
+                        <br>
+                        <span class="author-block"><sup>5</sup>Division of AMC and Department of ECE, HKUST,</span>
+                        <span class="author-block"><sup>6</sup>State Key Laboratory of Multimodal Artificial Intelligence Systems, CASIA</span>
+                        <br>
+                        <span class="author-block"><sup>*</sup>Equal Contribution</span> 
+                        <span class="author-block"><sup><i class="fas fa-envelope" style="margin-left: 5px; color: #555;"></i></sup>Corresponding Author</span> 
+                        <br>
+                        <br>
+                        <br>
+                    </div> -->
+
+                    <a class="paper-button" href="" target="_blank" rel="noopener noreferrer">
+                        <!-- <span class="icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#000"><path d="M280-280h280v-80H280v80Zm0-160h400v-80H280v80Zm0-160h400v-80H280v80Zm-80 480q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm0-560v560-560Z"/></svg>
+                        </span> -->
+                        <span class="icon">
+                            <!-- <i class="ai ai-arxiv"></i> -->
+                            <i class="fas fa-file-pdf"></i>
+                        </span>
+                        <span>
+                            Technique Report
+                        </span>
+                    </a>
+                    <a class="paper-button" href="https://github.com/meituan-longcat/LongCat-Video" target="_blank" rel="noopener noreferrer">
+                        <!-- <span class="icon">
+                            <svg  class="fab fa-github" height="24px" viewBox="0 -960 960 960" width="24px" fill="#000"><path d="M280-280h280v-80H280v80Zm0-160h400v-80H280v80Zm0-160h400v-80H280v80Zm-80 480q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm0-560v560-560Z"/></svg>
+                        </span> -->
+                        <span class="icon">
+                            <i class="fab fa-github"></i>
+                        </span>
+                        <span>
+                            Code
+                        </span>
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <section id="shots">
+            <div class="text">
+                <h1>Actor/Actoress</h1>
+            </div>
+            <div class="carousel-container" id="carousel-shots">
+                <button class="carousel-nav prev">‹</button>
+
+                <div class="carousel-wrapper">
+                    <div class="carousel-track">
+                        <div class="carousel-item" data-caption="Al Pacino in a dark pinstripe suit delivering a powerful statement is talking.">
+                            <div class="video-player audio-control">
+                                <video loop playsinline preload="none" muted src="videos/actor/0020-0021.mp4"></video>
+                            </div>
+                        </div>
+                        <div class="carousel-item" data-caption="A contemplative, intimate close-up portrait of a blonde woman is talking. Her expression is thoughtful and focused, with her gaze directed slightly upward and to the right.">
+                            <div class="video-player audio-control">
+                                <video loop playsinline preload="none" muted src="videos/actor/007-008.mp4"></video>
+                            </div>
+                        </div>
+                        <div class="carousel-item" data-caption="A haunting, cinematic close-up of Arthur Fleck (The Joker) laughing, his expression one of profound despair and vulnerability. The tight portrait uses low-key, cool green lighting to emphasize his face, where smudged clown makeup is streaked with tears. The dark, blurry background creates a claustrophobic atmosphere of isolation.">
+                            <div class="video-player audio-control">
+                                <video loop playsinline preload="none" muted src="videos/actor/009-0010.mp4"></video>
+                            </div>
+                        </div>
+                        <div class="carousel-item" data-caption="A medium shot shows a woman with long blonde hair speaking in a modern talk-show set, positioned behind a sleek black microphone. The background is a dynamic video wall displaying a breathtaking, glittering nighttime cityscape, creating a professional and glamorous interview atmosphere.">
+                            <div class="video-player audio-control">
+                                <video loop playsinline preload="none" muted src="videos/actor/0010-0011.mp4"></video>
+                            </div>
+                        </div>
+                        <div class="carousel-item" data-caption="A gray-haired man in a dark suit and red tie is speaking earnestly into a black microphone at a wooden desk. The formal, softly-lit scene features framed portraits on a light wall behind him, capturing his subtle gestures as he addresses an audience.">
+                            <div class="video-player audio-control">
+                                <video loop playsinline preload="none" muted src="videos/actor/0012-0013.mp4"></video>
+                            </div>
+                        </div>
+                        <div class="carousel-item" data-caption="A close-up shot focuses on a young woman with curly, dark hair, wearing a patterned headscarf and a gingham shirt. Her face is contorted in an expression of intense anguish, mouth slightly open, eyes wide and glistening with tears, conveying deep emotional distress and despair. The background is blurred and earthy, suggesting an outdoor or rustic setting.">
+                            <div class="video-player audio-control">
+                                <video loop playsinline preload="none" muted src="videos/actor/new_1.mp4"></video>
+                            </div>
+                        </div>
+                        <div class="carousel-item" data-caption="A medium close-up shot of a charismatic, dark-haired man in a sharp pinstripe suit and a red tie, holding a microphone close to his mouth. He is delivering an impassioned speech, with one hand raised dramatically in the air as if making a powerful point. His expression is intense and commanding, conveying authority and high energy, likely in a corporate or office setting with vertical blinds visible in the background.">
+                            <div class="video-player audio-control">
+                                <video loop playsinline preload="none" muted src="videos/actor/new_2.mp4"></video>
+                            </div>
+                        </div>
+                        <div class="carousel-item" data-caption="A tense, cinematic medium shot captures a Caucasian man in a corduroy jacket and plaid shirt, talking with an intense, menacing glare in a dim hotel room. Soft, hazy light filters through a patterned curtain behind him, highlighting the unspoken tension and a muted palette of browns and grays.">
+                            <div class="video-player audio-control">
+                                <video loop playsinline preload="none" muted src="videos/actor/004-005.mp4"></video>
+                            </div>
+                        </div>
+                        <div class="carousel-item" data-caption="A glamorous medium shot of a woman in a metallic gold gown, talking on stage at an awards ceremony, holding a trophy. She is illuminated by a spotlight against a dramatic, deep blue starry backdrop.">
+                            <div class="video-player audio-control">
+                                <video loop playsinline preload="none" muted src="videos/actor/new_3.mp4"></video>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <button class="carousel-nav next">›</button>
+                <div class="carousel-caption"></div>
+
+                <div class="carousel-dots"></div>
+            </div>
+            <div class="audio-button audio-button-mobile"></div>
+        </section>
+
+
+
+
+
+<section id="singer">
+    <div class="text">
+        <h1>Singer</h1>
+    </div>
+    <div class="carousel-container" id="carousel-singer">
+        <button class="carousel-nav prev">‹</button>
+        <div class="carousel-wrapper">
+            <div class="carousel-track">
+                <div class="carousel-item" data-caption="A musician stands on an outdoor stage, holding a microphone close to his mouth with one hand while strumming a black electric guitar with the other. He passionately talks into the microphone. The scene captures musical equipment and another band member visible in the background. ">
+                    <div class="video-player audio-control">
+                        <video loop playsinline preload="none" muted src="videos/singer/0009.mp4"></video>
+                    </div>
+                </div>
+                <div class="carousel-item" data-caption="On a concert stage illuminated by dramatic spotlights, a singer stands at the microphone, passionately performing a song. The camera smoothly circles around the singer, capturing dynamic angles as she tightly held the microphone with both hands and moves body to the rhythm of the music. The energetic atmosphere is enhanced by the vibrant lighting and the presence of musical equipment in the background.">
+                    <div class="video-player audio-control">
+                        <video loop playsinline preload="none" muted src="videos/singer/0000.mp4"></video>
+                    </div>
+                </div>
+                <div class="carousel-item" data-caption="A medium close-up shot features a large, fluffy, light brown feathered bird character holding a microphone with both hands, singing or shouting dramatically. Its eyes are wide and its beak is open in an expressive manner, conveying a mix of surprise and intense performance. The background is a dark stage setting, with warm, dramatic lighting highlighting the character.">
+                    <div class="video-player audio-control">
+                        <video loop playsinline preload="none" muted src="videos/singer/bird.mp4"></video>
+                    </div>
+                </div>
+                <div class="carousel-item" data-caption="Medium shot: A woman in a flowing white dress passionately sings into a microphone on a stage at the edge of a dramatic mountain cliff. She is illuminated by a spotlight against a dark, epic night sky background.">
+                    <div class="video-player audio-control">
+                        <video loop playsinline preload="none" muted src="videos/singer/new_1.mp4"></video>
+                    </div>
+                </div>
+                <div class="carousel-item" data-caption="A man stands outdoors in front of a microphone, strumming an acoustic guitar and talking into the mic. The person's mouth shape changes with speech. He performs energetically, moving his fingers along the fretboard.">
+                    <div class="video-player audio-control">
+                        <video loop playsinline preload="none" muted src="videos/singer/0003.mp4"></video>
+                    </div>
+                </div>
+                <div class="carousel-item" data-caption="A person in ornate traditional Chinese costume (green/red robe, silver headdress) is intently recording music in a modern professional studio. Wearing large white headphones, he sings into a condenser microphone, set against a softly lit background of blurred audio equipment, creating a serene and focused atmosphere.">
+                    <div class="video-player audio-control">
+                        <video loop playsinline preload="none" muted src="videos/singer/0006.mp4"></video>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <button class="carousel-nav next">›</button>
+        <div class="carousel-caption"></div>
+
+        <div class="carousel-dots"></div>
+    </div>
+    <!-- <div class="carousel-caption"></div> -->
+    <div class="audio-button audio-button-mobile"></div>
+</section>
+
+
+<section id="podcast">
+    <div class="text">
+        <h1>Podcast</h1>
+    </div>
+    <div class="carousel-container" id="carousel-podcast">
+        <button class="carousel-nav prev">‹</button>
+
+        <div class="carousel-wrapper">
+            <div class="carousel-track">
+                <div class="carousel-item" data-caption="Static camera, broadcast interview style. Taylor Swift sits on a talk show set, wearing a shimmering champagne one-shoulder dress. She speaks engagingly while gesturing with her left hand, set against a backdrop of a blurred nighttime city skyline with a bridge.">
+                    <div class="video-player audio-control">
+                        <video loop playsinline preload="none" muted src="videos/podcast/Taylor.mp4"></video>
+                    </div>
+                </div>
+                <div class="carousel-item" data-caption="Static camera, podcast interview style. Jensen Huang, wearing his signature black leather jacket and glasses, speaks animatedly into a microphone. He looks to the side with an engaged expression, seated in a room with a bookshelf and a green plant in the background.">
+                    <div class="video-player audio-control">
+                        <video loop playsinline preload="none" muted src="videos/podcast/Huangrenxun.mp4"></video>
+                    </div>
+                </div>
+                <div class="carousel-item" data-caption="Static camera, podcast interview style. Barack Obama, wearing a blue button-down shirt, speaks passionately into a microphone while gesturing broadly with both hands. He is seated in a modern studio with large grid windows and a large potted plant visible behind him.">
+                    <div class="video-player audio-control">
+                        <video loop playsinline preload="none" muted src="videos/podcast/Obama.mp4"></video>
+                    </div>
+                </div>
+                <div class="carousel-item" data-caption="Static camera, podcast interview style. Sam Altman, wearing a black long-sleeve shirt, looks intently at the host and speaks into a microphone. He is seated in a well-decorated room with a bookshelf, plants, and a gold-toned lamp visible in the background.">
+                    <div class="video-player audio-control">
+                        <video loop playsinline preload="none" muted src="videos/podcast/Sam.mp4"></video>
+                    </div>
+                </div>
+                <div class="carousel-item" data-caption="Static camera, interview style. Two men sit facing each other across a small table with a white plush toy resembling a simplified TV screen between them. The man on the left wears a light jacket and dark pants, and the man on the right wears a brown jacket and dark trousers. The background features light, arched wall panels.">
+                    <div class="video-player audio-control">
+                        <video loop playsinline preload="none" muted src="videos/podcast/Yizhongtian_Luoxiang.mp4"></video>
+                    </div>
+                </div>
+                <div class="carousel-item" data-caption="Static camera, podcast interview style. A man wearing a black baseball cap, glasses, and a black t-shirt with white text sits in front of a microphone. He is speaking with an intent expression, and the background features a decorative black X-shaped element and a potted plant.">
+                    <div class="video-player audio-control">
+                        <video loop playsinline preload="none" muted src="videos/podcast/kobe_merged.mp4"></video>
+                    </div>
+                </div>
+                <div class="carousel-item" data-caption="Static camera, podcast interview style. A man (left) wearing a blue jacket over a dark graphic t-shirt sits across from a woman (right) wearing a brown top and blue jeans, holding a book. They are seated in a modern kitchen/living room setting with a marble-topped table between them.">
+                    <div class="video-player audio-control">
+                        <video loop playsinline preload="none" muted src="videos/podcast/ElonMask.mp4"></video>
+                    </div>
+                </div>
+                <div class="carousel-item" data-caption="Static camera, podcast interview style. A woman with long dark hair, wearing a white halter-neck top and a delicate necklace, sits in front of a microphone. She is looking directly towards the camera/viewer. The background features dark shelving with various decorative items, including potted plants and some lighting that casts a blue hue on the left side of the frame">
+                    <div class="video-player audio-control">
+                        <video loop playsinline preload="none" muted src="videos/podcast/10habits.mp4"></video>
+                    </div>
+                </div>
+                <div class="carousel-item" data-caption="Static camera, interview style. A woman with wavy light brown hair, wearing a beige sweater, smiles and gestures with her hands. The background is a warm indoor setting with red flowers and a lamp.">
+                    <div class="video-player audio-control">
+                        <video loop playsinline preload="none" muted src="videos/podcast/Gu.mp4"></video>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+        <button class="carousel-nav next">›</button>
+        <div class="carousel-caption"></div>
+
+        <div class="carousel-dots"></div>
+    </div>
+    <div class="audio-button audio-button-mobile"></div>
+</section>
+
+
+<section id="sales">
+    <div class="text">
+        <h1>Sales</h1>
+    </div>
+    <div class="carousel-container" id="carousel-sales">
+        <button class="carousel-nav prev">‹</button>
+        <div class="carousel-wrapper">
+            <div class="carousel-track">
+                <div class="carousel-item" data-caption="A man in a gaming chair gestures animatedly at his laptop screen in a neon-lit room, actively presenting or selling.">
+                    <div class="video-player audio-control">
+                        <video loop playsinline preload="none" muted src="videos/sales/1.mp4"></video>
+                    </div>
+                </div>
+                <div class="carousel-item" data-caption="A medium shot shows a young female streamer in a colorful pop-art hoodie, sitting at a white desk filled with various snack bags with an expression of infectious enthusiasm. She holds an open bag of yellow chips towards the camera lens while smiling broadly, conveying a mix of excitement and persuasion as if passionately recommending a delicious product to her live viewers.">
+                    <div class="video-player audio-control">
+                        <video loop playsinline preload="none" muted src="videos/sales/2.mp4"></video>
+                    </div>
+                </div>
+                <div class="carousel-item" data-caption="A medium shot shows a professional beauty presenter with long wavy hair in a white top, sitting behind a counter lined with golden skincare products with an expression of elegant confidence. She holds a small serum bottle up delicately while speaking, conveying a mix of expertise and allure as if demonstrating a premium routine to her audience.">
+                    <div class="video-player audio-control">
+                        <video loop playsinline preload="none" muted src="videos/sales/3.mp4"></video>
+                    </div>
+                </div>
+                <div class="carousel-item" data-caption="A medium shot shows an elegant jewelry consultant in a sharp black blazer and white gloves, surrounded by leather display cases with an expression of polished grace. She presents an open black box containing a sparkling diamond ring directly to the camera while smiling gently, conveying a mix of pride and exclusivity as if unveiling a masterpiece to a VIP client.">
+                    <div class="video-player audio-control">
+                        <video loop playsinline preload="none" muted src="videos/sales/4.mp4"></video>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <button class="carousel-nav next">›</button>
+        <div class="carousel-caption"></div>
+
+        <div class="carousel-dots"></div>
+    </div>
+    <!-- <div class="carousel-caption"></div> -->
+    <div class="audio-button audio-button-mobile"></div>
+</section>
+
+<section id="multiperson">
+    <div class="text">
+        <h1>Multi-Person</h1>
+    </div>
+    <div class="carousel-container" id="carousel-multiperson">
+        <button class="carousel-nav prev">‹</button>
+        <div class="carousel-wrapper">
+            <div class="carousel-track">
+                <div class="carousel-item" data-caption="Static camera. Two people sit side by side in a warmly lit café, having a lively conversation. The woman gestures while speaking, and the man listens attentively, nodding in agreement. A relaxed and friendly atmosphere.">
+                    <div class="video-player audio-control">
+                        <video loop playsinline preload="none" muted src="videos/multihuman/5.mp4"></video>
+                    </div>
+                </div>
+                <div class="carousel-item" data-caption="Static camera. Two news anchors sit at a glass desk in a modern studio, discussing financial updates. They gesture towards background screens displaying headlines and dynamic graphs.">
+                    <div class="video-player audio-control">
+                        <video loop playsinline preload="none" muted src="videos/multihuman/6.mp4"></video>
+                    </div>
+                </div>
+                <div class="carousel-item" data-caption="Static camera. Two people sit on a couch in a cozy library, wearing microphones for a virtual meeting. A ring light, smartphone, and a laptop showing video participants are set up in front. They speak clearly and gesture occasionally.">
+                    <div class="video-player audio-control">
+                        <video loop playsinline preload="none" muted src="videos/multihuman/12.mp4"></video>
+                    </div>
+                </div>
+                <div class="carousel-item" data-caption="Static camera, animated film style. An anthropomorphic rabbit cop and a fox in a jacket talk on a rainy, neon-lit street. The rabbit gestures earnestly while the fox looks sly and amused.">
+                    <div class="video-player audio-control">
+                        <video loop playsinline preload="none" muted src="videos/multihuman/18.mp4"></video>
+                    </div>
+                </div>
+                <div class="carousel-item" data-caption="Static camera. In a cozy kitchen, an elderly woman and a young boy have a lively chat while making dough. The woman shapes the dough as the enthusiastic boy watches and talks. Ingredients, utensils, and a steaming pot create a warm atmosphere.">
+                    <div class="video-player audio-control">
+                        <video loop playsinline preload="none" muted src="videos/multihuman/21.mp4"></video>
+                    </div>
+                </div>
+                <div class="carousel-item" data-caption="Static camera, animated style. A child and a friendly skeleton sit at a festive table with marigolds, candles, and guitars. The skeleton gestures while storytelling, and the child listens attentively. Warm Day of the Dead atmosphere with papel picado banners.">
+                    <div class="video-player audio-control">
+                        <video loop playsinline preload="none" muted src="videos/multihuman/20.mp4"></video>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <button class="carousel-nav next">›</button>
+        <div class="carousel-caption"></div>
+
+        <div class="carousel-dots"></div>
+    </div>
+    <!-- <div class="carousel-caption"></div> -->
+    <div class="audio-button audio-button-mobile"></div>
+</section>
+
+
+
+<section id="identity">
+    <div class="text">
+        <h1>What is InfiniteTalk?</h1>
+        <p>
+            Given a source video and a target audio. InfiniteTalk generate audio synchronized full body motion while preserving the identity, background, and camera movements from the source video. Our method can also use a single image condition to perform long sequence human animation.
+        </p>
+    </div>
+
+    <div class="identity-container">
+        
+        <div class="identity-half">
+            <div class="text">
+                <h2>Text-Audio-to-video</h2>
+            </div>
+            <div class="grid">
+                
+                <div class="video-player">
+                    <div class="text-prompt-box">
+                        "Static medium shot. Man in denim jacket and beanie talking on snowy shore, gazing at city skyline across frozen river. Muted cool tones, winter light, slow pan."
+                        </div>
+                    <figcaption class="video-caption">Text input</figcaption>
+                </div>
+
+                <div class="video-player audio-control span22">
+                    <video muted loop playsinline preload="none" src="videos/demo/0005-00-Static camera, full-body medium shot. A contemplat.mp4"></video>
+                </div>
+
+                <div class="video-player">
+                    <audio controls style="width: 100%; margin-top: auto;">
+                        <source src="videos/demo/actor_6.wav" type="audio/wav">
+                    </audio>
+                    <figcaption class="video-caption">Audio input</figcaption>
+                </div>
+            </div>
+        </div>
+
+        <div class="identity-half">
+            <div class="text">
+                <h2>Text-Image-Audio-to-video</h2>
+            </div>
+            <div class="grid">
+                <div class="video-player audio-control">
+                    <img src="videos/demo/actor_17.png" style="width:100%; height:100%; object-fit:cover;"></img>
+                    <figcaption class="video-caption">Image input</figcaption>
+                </div>
+
+                <div class="video-player audio-control span22">
+                    <video muted loop playsinline preload="none" src="videos/demo/0016-00-17- Static camera. Medium shot. the Joker is talki.mp4"></video>
+                </div>
+
+                <div class="video-player" style="display: flex; flex-direction: column;">
+                    <audio controls style="width: 100%;">
+                        <source src="videos/demo/actor_17.wav" type="audio/wav">
+                    </audio>
+                    
+                    <div class="text-prompt-box small">
+                        Static medium shot. The Joker, in full clown makeup and a red suit with a green shirt, is seated in a dim room. He is leaning forward, mid-conversation, with a subtle shift in his intense gaze.
+                        </div>
+
+                    <figcaption class="video-caption">Audio & Text input</figcaption>
+                </div>
+            </div>
+        </div>
+        
+    </div>    
+    <div class="audio-button audio-button-mobile"></div>
+</section>
+        <section id="audio">
+            <div class="text">
+                <h1>
+                    InfiniteTalk v.s. LongCat-Video-Avatar
+                </h1>
+            </div>
+            <div class="audio-button audio-button-mobile"></div>
+            <div class="text">
+                <h2>
+                    Comparison
+                </h2>
+            </div>
+            <div class="grid2">
+                <div class="video-player audio-control">
+                    <video muted loop playsinline preload="none" src="videos/comp_avatar/inf_test_6.mp4"></video>
+                    <figcaption class="video-caption">InfiniteTalk</figcaption>
+                </div>
+                <div class="video-player audio-control">
+                    <video muted loop playsinline preload="none" src="videos/comp_avatar/long_test_6.mp4"></video>
+                    <figcaption class="video-caption">Ours</figcaption>
+                </div>
+                <div class="video-player audio-control">
+                    <video muted loop playsinline preload="none" src="videos/comp_avatar/inf_test_1.mp4"></video>
+                    <figcaption class="video-caption">InfiniteTalk</figcaption>
+                </div>
+                <div class="video-player audio-control">
+                    <video muted loop playsinline preload="none" src="videos/comp_avatar/long_test_1.mp4"></video>
+                    <figcaption class="video-caption">Ours</figcaption>
+                </div>
+                <div class="video-player audio-control">
+                    <video muted loop playsinline preload="none" src="videos/comp_avatar/inf_1.mp4"></video>
+                    <figcaption class="video-caption">InfiniteTalk</figcaption>
+                </div>
+                <div class="video-player audio-control">
+                    <video muted loop playsinline preload="none" src="videos/comp_avatar/long_1.mp4"></video>
+                    <figcaption class="video-caption">Ours</figcaption>
+                </div>
+            </div>
+        </section>
+
+        <!-- <section id="shots">
+            <div class="text">
+                <h1>
+                    Movie shots dubbing
+                </h1>
+            </div>
+            <div class="grid">
+                <div class="video-player audio-control">
+                    <video loop playsinline preload="none" muted src="videos/sing/001.mp4"></video>
+                </div>
+                <div class="video-player audio-control  span22">
+                    <video loop playsinline preload="none" muted src="videos/sing/008.mp4"></video>
+                </div>
+                <div class="video-player audio-control">
+                    <video loop playsinline preload="none" muted src="videos/sing/002.mp4"></video>
+                </div>
+                <div class="video-player audio-control span22">
+                    <video loop playsinline preload="none" muted src="videos/sing/003.mp4"></video>
+                </div>
+                <div class="video-player audio-control">
+                    <video loop playsinline preload="none" muted src="videos/sing/005.mp4"></video>
+                </div>
+                <div class="video-player audio-control">
+                    <video loop playsinline preload="none" muted src="videos/sing/004.mp4"></video>
+                </div>
+
+                
+            </div>
+            <div class="audio-button audio-button-mobile"></div>
+        </section> -->
+
+        
+<!-- 
+        <section id="shots">
+            <div class="text">
+                <h1>
+                    Generate instruction-following videos
+                </h1>
+            </div>
+            <div class="grid">
+                        <div>
+                        <div class="video-player audio-control">
+                            <video loop playsinline preload="none" muted src="videos/instruct/001.mp4"></video>
+                        </div>
+                        <p>In a cozy, warmly lit room, Nick Wilde, a fox with a mischievous grin, sits across from Judy Hopps, a rabbit with a determined expression. 
+                            Both are dressed casually; Nick in a green shirt and striped tie, Judy in a blue outfit with headphones resting on the table. 
+                            A Disney-branded mug sits between them on the wooden table. 
+                            The background features a rustic interior with a lamp, a window, and various household items, creating a homely atmosphere. 
+                            A medium shot captures their interaction as Nick picks up the mug and gently touches Judy's head, suggesting a moment of camaraderie and connection.</p>
+                        </div>
+
+                        <div>
+                        <div class="video-player audio-control">
+                            <video loop playsinline preload="none" muted src="videos/instruct/002.mp4"></video>
+                        </div>
+                        <p>A man and a woman are seated at an outdoor table, engaged in a conversation.
+                            The woman, dressed in a light pink top with a white cardigan, holds a red cup
+                            of coffee, takes a sip, and then places it back on the saucer. The man, wearing
+                            a striped shirt over a white t-shirt, is engrossed in his smartphone, looking
+                            down intently. The table is adorned with two red cups of coffee and a plate
+                            with a croissant. The background features a charming European street with pastel-colored
+                            buildings, greenery, and a partially open green umbrella. The scene captures
+                            a casual, everyday moment with a warm, inviting atmosphere.</p>
+                        </div>
+
+                        <div>
+                        <div class="video-player audio-control">
+                            <video loop playsinline preload="none" muted src="videos/instruct/003.mp4"></video>
+                        </div>
+                        <p>Two individuals sit at a white table in a studio with blue-and-white acoustic wall panels. 
+                            A man on the left wears a dark casual top, holding a coffee mug. 
+                            The woman on the right has a pair of studio headphones resting near her. 
+                            The man is speaking while the woman is listening and nodding occasionally. 
+                            The woman picks up the black headphones. A large wall-mounted TV displays technical interfaces.
+                             The scene suggests a collaborative workspace with professional audio-visual equipment in a bright studio environment.</p>
+                        </div>
+                    </div>
+                    <div class="grid">
+                        <div class="video-player audio-control span21">
+                            <video muted loop playsinline preload="none" muted src="videos/instruct/006.mp4"></video>
+                        </div>
+                        <div class="video-player audio-control">
+                            <video muted loop playsinline preload="none" muted src="videos/instruct/005.mp4"></video>
+                        </div>
+                    </div>
+        </section> -->
+
+        <!-- <section id="i2v">
+            <div class="text">
+                <h1>
+                    Comparison (Video input)
+                </h1>
+            </div>
+            <div class="grid">
+                <div class="video-player audio-control">
+                    <video muted loop playsinline preload="none" src="videos/creative/1/1.mp4"></video>
+                </div>
+                <p> MuseTalk
+                </div>
+
+                <div class="video-player audio-control">
+                    <video muted loop playsinline preload="none" src="videos/creative/1/2.mp4"></video>
+                </div>
+                <div class="video-player audio-control">
+                    <video muted loop playsinline preload="none" src="videos/creative/1/3.mp4"></video>
+                </div>
+            </div>
+
+            <div></div>
+            
+            <div class="grid grid3">
+                <div class="video-player audio-control">
+                    <video muted loop playsinline preload="none" src="videos/creative/2/1.mp4"></video>
+                </div>
+                <div class="video-player audio-control">
+                    <video muted loop playsinline preload="none" src="videos/creative/2/2.mp4"></video>
+                </div>
+                <div class="video-player audio-control">
+                    <video muted loop playsinline preload="none" src="videos/creative/2/3.mp4"></video>
+                </div>
+            </div>
+            <div class="audio-button audio-button-mobile"></div>
+        </section> -->
+        
+        <!-- <section id="i2v">
+            <div class="text">
+                <h1>
+                    Comparison (Single image input)
+                </h1>
+            </div>
+            <div class="grid">
+                <div class="video-player audio-control">
+                    <video muted loop playsinline preload="none" src="videos/creative/1/1.mp4"></video>
+                </div>
+                <div class="video-player audio-control">
+                    <video muted loop playsinline preload="none" src="videos/creative/1/2.mp4"></video>
+                </div>
+                <div class="video-player audio-control">
+                    <video muted loop playsinline preload="none" src="videos/creative/1/3.mp4"></video>
+                </div>
+            </div>
+
+            <div></div>
+            
+            <div class="grid grid3">
+                <div class="video-player audio-control">
+                    <video muted loop playsinline preload="none" src="videos/creative/2/1.mp4"></video>
+                </div>
+                <div class="video-player audio-control">
+                    <video muted loop playsinline preload="none" src="videos/creative/2/2.mp4"></video>
+                </div>
+                <div class="video-player audio-control">
+                    <video muted loop playsinline preload="none" src="videos/creative/2/3.mp4"></video>
+                </div>
+            </div>
+            <div class="audio-button audio-button-mobile"></div>
+        </section> -->
+
+        <section class="section">
+            <div class="container is-max-desktop">
+              <!-- Abstract. -->
+              <div class="columns is-centered has-text-centered">
+                <div class="column is-four-fifths">
+                  <h1>Abstract</h1>
+                  <div class="content has-text-justified">
+                    <p>
+                        Recent advances in audio-driven human video synthesis have significantly improved the realism
+of half-body and full-body generation. However, generating long-duration sequences remains a
+persistent challenge, as existing methods often suffer from error accumulation and identity drift over
+time. While reference image injection strategies (e.g., InfiniteTalk) have been proposed to mitigate
+these issues, they frequently result in a rigid “copy-paste” phenomenon and limited motion diversity
+due to conditional image leakage. Furthermore, current models exhibit an undesirable over-reliance
+on speech signals, leading to unnaturally static behaviors during silent segments. To address these
+limitations, we present LongCat-Video-Avatar, a unified architecture designed for super-realistic,
+lip-synchronized long video generation with natural dynamics and consistent identity. It supports
+multiple video generation modes, including text-audio-to-video, text-audio-image-to-video, and
+audio-conditioned video continuation. We first analyze the coupling between speech and human
+motion, proposing a Disentangled Unconditional Guidance strategy that separates audio signals from
+motion dynamics to ensure natural behavior even in the absence of speech. To alleviate the “copy-
+paste” issue, we introduce a Reference Skip Attention mechanism that strategically incorporates
+reference cues to preserve identity while preventing excessive leakage, thereby balancing visual
+fidelity with motion richness. Additionally, to tackle error accumulation caused by redundant VAE
+decode-encode cycles in autoregressive generation, we propose a Cross-Chunk Latent Stitching
+strategy. Extensive evaluations demonstrate the effectiveness of our approach in generating super
+realistic, long-duration human videos.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+        </section>
+
+        <section class="section">
+            <div class="container is-max-desktop">
+              <div class="columns is-centered has-text-centered">
+                <!-- <div class="column is-four-fifths"> -->
+                <div class="column">
+                  <h1 class="title is-3">Method</h1>
+                  <div class="content has-text-justified">
+                    <p>
+                        We introduce LongCat-Video-Avatar, a unified DiT-based framework designed for generating super-realistic, long-duration audio-driven human videos with consistent identity and natural dynamics. To address the issue of unnatural static postures during silent intervals, we propose Disentangled Unconditional Guidance, which effectively decouples speech signals from global body motion by distinguishing silent audio embeddings from null conditions. Furthermore, to prevent identity drift without inducing rigid "copy-paste" artifacts, we devise a Reference Skip Attention mechanism that selectively incorporates reference cues to balance visual fidelity with motion diversity. Finally, we implement Cross-Chunk Latent Stitching, a training strategy that eliminates redundant VAE decode-encode cycles to reduce pixel degradation and bridge the train-test gap, ensuring seamless video continuation. Our architecture also extends to multi-person scenarios through L-ROPE-based audio-visual binding.
+                    </p>
+                    <div class="column">
+                      <img src="images/pipeline.png" width="100%"/>
+                    </div>
+                  </div>          
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section id="team">
+            <div class="content">
+                <p>部分素材和视频源于真实视频，生成内容仅限学术使用，不允许商业使用。</p>
+                <p>Some materials and video sources are derived from real videos. The generated content is for academic use only and commercial use is not permitted.</p>
+            </div>
+        </section>
+
+
+        <script>
+            // Lazy load
+            const lazyLoadObserver = new IntersectionObserver(entries => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.play();
+                    } else {
+                        entry.target.pause();
+                    }
+                });
+            }, {rootMargin: '500px'});
+            document.querySelectorAll("video:not(.no-autoplay)").forEach(video => {
+                lazyLoadObserver.observe(video);
+                video.addEventListener("pointerdown", () => video.play());
+            });
+
+            // Audio control
+            const body = document.querySelector("body");
+            let globalmuted = true;
+            const isNarrow = () => window.innerWidth < 512;
+            document.querySelectorAll(".audio-control").forEach(wrapper => {
+                const video = wrapper.querySelector("video");
+                const button = document.createElement("div");
+
+                button.className = "audio-button";
+                button.onclick = function() {
+                    globalmuted = !globalmuted;
+                    video.muted = globalmuted;
+                    body.setAttribute("muted", globalmuted);
+                }
+                wrapper.addEventListener("mouseenter", () => {if (!isNarrow()) {video.muted = globalmuted}});
+                wrapper.addEventListener("mouseleave", () => {if (!isNarrow()) {video.muted = true}});
+                wrapper.appendChild(button);
+            });
+            document.querySelectorAll(".audio-button-mobile").forEach(button => {
+                button.onclick = () => {
+                    globalmuted = !globalmuted;
+                    body.setAttribute("muted", globalmuted);
+                    document.querySelectorAll(".audio-control video").forEach(video => {
+                        video.muted = globalmuted || !video.isIntersecting;
+                    });
+                }
+            });
+
+            const audioObserver = new IntersectionObserver(entries => {
+                entries.forEach(entry => {
+                    const video = entry.target;
+                    if (isNarrow()) {
+                        video.muted = globalmuted || !entry.isIntersecting;
+                    }
+                    video.isIntersecting = entry.isIntersecting;
+                });
+            }, {threshold: 0.8});
+            document.querySelectorAll(".audio-control video").forEach(video => audioObserver.observe(video));
+
+            // progress bar.
+            document.querySelectorAll(".duration-indicator").forEach((wrapper) => {
+                const video = wrapper.querySelector("video");
+                const bar = document.createElement("div");
+                const barinner = document.createElement("div");
+                const time = document.createElement("div");
+
+                bar.className = "bar";
+                barinner.className = "barinner";
+                time.className = "time";
+
+                wrapper.appendChild(bar);
+                bar.appendChild(barinner);
+                wrapper.appendChild(time);
+
+                function format(seconds) {
+                    seconds = Math.round(seconds);
+                    const minutes = Math.floor(seconds / 60);
+                    seconds = seconds - (minutes * 60);
+                    seconds = String(seconds);
+                    seconds = seconds.length > 1 ? seconds : "0" + seconds;
+                    return `${minutes}:${seconds}`;
+                }
+
+                function update() {
+                    if (!isNaN(video.duration)) {
+                        barinner.style.width = `${video.currentTime / video.duration * 100}%`;
+                        time.innerText = `${format(video.currentTime)} / ${format(video.duration)}`;
+                    } else {
+                        time.innerText = "";
+                    }
+                    requestAnimationFrame(update);
+                }
+                requestAnimationFrame(update);
+            })
+
+            const shotsVideo = document.querySelector("#shots video");
+            const shotList = document.querySelector("#shots .shots-list");
+            const shotListItems = document.querySelectorAll("#shots .shots-list > div");
+            const shotTimesteps = Array.from(shotListItems).map(element => parseInt(element.getAttribute("timestep")));
+
+            shotListItems.forEach(element => {
+                element.addEventListener("click", () => {
+                    const timestep = parseInt(element.getAttribute("timestep"));
+                    shotsVideo.currentTime = timestep;
+                });
+            });
+
+            let lastShot = null;
+            shotsVideo.addEventListener("timeupdate", () => {
+                const currentTime = shotsVideo.currentTime;
+                const currentShot = shotTimesteps.findLastIndex(x => x < currentTime + 0.5);
+                if (currentShot != lastShot) {
+                    if (lastShot != null) {
+                        shotListItems[lastShot].removeAttribute("selected");
+                    }
+                    shotListItems[currentShot].setAttribute("selected", true);
+                    if (isNarrow() && Math.abs(shotList.scrollLeft - shotListItems[currentShot].offsetLeft) < 500) {
+                        shotList.scrollTo({
+                            left: shotListItems[currentShot].offsetLeft,
+                            behavior: "smooth"
+                        });
+                    }
+                    lastShot = currentShot;
+                }
+            })
+
+            document.addEventListener("scroll", () => {
+                const top = Math.max(Math.min(window.scrollY / 200, 1), 0);
+                document.documentElement.style.setProperty('--intro-scale', top)
+            })
+
+            document.querySelectorAll(".video-slider").forEach((slider) => {
+                // slider
+                const sliderButton = slider.querySelector(".slider");
+                const sliderVideo1 = slider.querySelector(".video1");
+                let sliding = false;
+                let slidePosition = 0.5;
+                let lastPointerX = null;
+                let lastSlidePosition = null;
+                sliderButton.addEventListener("pointerdown", e => {
+                    sliding = true;
+                    lastPointerX = e.clientX || e.touches[0].clientX;
+                    lastSlidePosition = sliderButton.offsetLeft;
+                    sliderButton.style.opacity = 1;
+                });
+                function handlemove(e) {
+                    if (sliding) {
+                        e.preventDefault();
+                        let clientX = e.clientX || e.touches[0].clientX;
+                        let deltaX = clientX - lastPointerX;
+                        let ratio = (lastSlidePosition + deltaX) / slider.offsetWidth;
+                        ratio = Math.min(Math.max(ratio, 0.01), 0.99);
+                        sliderButton.style.left = `${ratio * 100}%`;
+                        sliderVideo1.style.width = `${ratio * 100}%`;
+                    }
+                }
+                document.addEventListener("mousemove", handlemove);
+                document.addEventListener("touchmove", handlemove, {passive: false});
+                document.addEventListener("pointermove", handlemove, {passive: false});
+                document.addEventListener("pointerup", () => {
+                    sliding = false;
+                    sliderButton.style.opacity = null;
+                });
+
+                // sync video.
+                const video1 = slider.querySelector(".video1 video");
+                const video2 = slider.querySelector(".video2 video");
+                function sync() {
+                    if (Math.abs(video2.currentTime - video1.currentTime) > 1 / 24) {
+                        video2.currentTime = video1.currentTime;
+                    }
+                    requestAnimationFrame(sync);
+                }
+                requestAnimationFrame(sync);
+
+                // full screen.
+                const fullscreenButton = slider.querySelector(".fullscreen");
+                if (!document.fullscreenEnabled) {
+                    fullscreenButton.remove();
+                } else {
+                    fullscreenButton.addEventListener("click", () => {
+                        if (!document.fullscreenElement) {
+                            slider.requestFullscreen();
+                            body.setAttribute("fullscreen", true);
+                        } else {
+                            document.exitFullscreen();
+                        }
+                    })
+                }
+            })
+            document.addEventListener("fullscreenchange", () => {
+                if (document.fullscreenElement != null) {
+                    body.setAttribute("fullscreen", "");
+                } else {
+                    body.removeAttribute("fullscreen");
+                }
+            });
+
+
+            // features film
+            document.querySelectorAll(".feature-video").forEach(featureVideo => {
+                const video = featureVideo.querySelector("video.final-video");
+                featureVideo.addEventListener("click", e => {
+                    video.currentTime = 0;
+                    video.play();
+                    video.requestFullscreen();
+                    video.style.opacity = 1;
+                })
+                video.addEventListener("fullscreenchange", () => {
+                    if (!document.fullscreenElement) {
+                        video.pause();
+                        video.style.opacity = 0;
+                    }
+                })
+                video.addEventListener("ended", () => {
+                    video.pause();
+                    video.style.opacity = 0;
+                    document.exitFullscreen();
+                })
+            });
+
+            document.querySelectorAll(".page-control").forEach(controller => {
+                controller.querySelectorAll(".page-select > div").forEach(selector => {
+                    selector.addEventListener("click", () => {
+                        const oldSelector = controller.querySelector(".page-select > div[selected=true]");
+                        if (selector != oldSelector) {
+                            selector.setAttribute("selected", "true");
+                            oldSelector.setAttribute("selected", "false");
+                            
+                            const newTarget = selector.getAttribute("target");
+                            const oldTarget = oldSelector.getAttribute("target");
+
+                            const newPage = controller.querySelector(`.page-content > div[page=${newTarget}]`);
+                            const oldPage = controller.querySelector(`.page-content > div[page=${oldTarget}]`);
+
+                            const oldPageScrollLeft = oldPage.scrollLeft;
+
+                            newPage.setAttribute("selected", "true");
+                            oldPage.setAttribute("selected", "false");
+
+                            newPage.querySelectorAll("video").forEach(video => {
+                                video.currentTime = 0;
+                                video.play();
+                            });
+
+                            oldPage.querySelectorAll("video").forEach(video => {
+                                video.pause();
+                            });
+
+                            newPage.scrollLeft = oldPageScrollLeft;
+                        }
+                    })
+                })
+            })
+// Carousel functionality
+function initCarousel(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    
+    const track = container.querySelector('.carousel-track');
+    const items = Array.from(container.querySelectorAll('.carousel-item'));
+    const prevBtn = container.querySelector('.carousel-nav.prev');
+    const nextBtn = container.querySelector('.carousel-nav.next');
+    const captionDiv = container.closest('section').querySelector('.carousel-caption');
+    const dotsContainer = container.querySelector('.carousel-dots');
+    
+    let currentIndex = 0;
+    
+    // Create dots
+    items.forEach((_, index) => {
+        const dot = document.createElement('div');
+        dot.className = 'carousel-dot';
+        if (index === 0) dot.classList.add('active');
+        dot.addEventListener('click', () => goToSlide(index));
+        dotsContainer.appendChild(dot);
+    });
+    
+    const dots = Array.from(dotsContainer.querySelectorAll('.carousel-dot'));
+    
+    function updateCarousel() {
+        // Calculate offset to center the active item
+// 获取当前选中的元素
+        const activeItem = items[currentIndex];
+        
+        // 1. 获取容器的中心点坐标
+        const containerCenter = container.offsetWidth / 2;
+        
+        // 2. 获取当前 Item 的中心点（相对于 track 的左侧距离 + 自身宽度的一半）
+        // offsetLeft 是元素距离父级(track)左边的距离
+        const itemCenter = activeItem.offsetLeft + (activeItem.offsetWidth / 2);
+        
+        // 3. 计算需要移动的距离：容器中心 - 元素中心
+        // 这样可以将元素的中心点与容器的中心点对齐
+        const offset = containerCenter - itemCenter;
+
+        track.style.transform = `translateX(${offset}px)`;        
+        track.style.transform = `translateX(${offset}px)`;
+        
+        // Update active states
+        items.forEach((item, index) => {
+            if (index === currentIndex) {
+                item.classList.add('active');
+            } else {
+                item.classList.remove('active');
+            }
+        });
+        
+        // Update dots
+        dots.forEach((dot, index) => {
+            if (index === currentIndex) {
+                dot.classList.add('active');
+            } else {
+                dot.classList.remove('active');
+            }
+        });
+        
+        // Update caption
+        const currentCaption = items[currentIndex].getAttribute('data-caption');
+        captionDiv.innerHTML = `<p class="active">${currentCaption}</p>`;
+        
+        // Play current video
+        const currentVideo = items[currentIndex].querySelector('video');
+        if (currentVideo) {
+            currentVideo.currentTime = 0;
+            currentVideo.play();
+        }
+        
+        // Pause other videos
+        items.forEach((item, index) => {
+            if (index !== currentIndex) {
+                const video = item.querySelector('video');
+                if (video) video.pause();
+            }
+        });
+    }
+    
+    function goToSlide(index) {
+        currentIndex = Math.max(0, Math.min(index, items.length - 1));
+        updateCarousel();
+    }
+    
+    function nextSlide() {
+        currentIndex = (currentIndex + 1) % items.length;
+        updateCarousel();
+    }
+    
+    function prevSlide() {
+        currentIndex = (currentIndex - 1 + items.length) % items.length;
+        updateCarousel();
+    }
+    
+    // Event listeners
+    prevBtn.addEventListener('click', prevSlide);
+    nextBtn.addEventListener('click', nextSlide);
+    
+    // Mouse wheel support
+    container.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        if (e.deltaY > 0) {
+            nextSlide();
+        } else {
+            prevSlide();
+        }
+    }, { passive: false });
+    
+    // Touch support
+    let touchStartX = 0;
+    let touchEndX = 0;
+    
+    container.addEventListener('touchstart', (e) => {
+        touchStartX = e.changedTouches[0].screenX;
+    });
+    
+    container.addEventListener('touchend', (e) => {
+        touchEndX = e.changedTouches[0].screenX;
+        handleSwipe();
+    });
+    
+    function handleSwipe() {
+        if (touchEndX < touchStartX - 50) {
+            nextSlide();
+        }
+        if (touchEndX > touchStartX + 50) {
+            prevSlide();
+        }
+    }
+    
+    // Keyboard support
+    document.addEventListener('keydown', (e) => {
+        const carouselSection = container.closest('section');
+        const rect = carouselSection.getBoundingClientRect();
+        const isInView = rect.top < window.innerHeight && rect.bottom > 0;
+        
+        if (isInView) {
+            if (e.key === 'ArrowLeft') {
+                prevSlide();
+            } else if (e.key === 'ArrowRight') {
+                nextSlide();
+            }
+        }
+    });
+    
+    // Initialize
+    updateCarousel();
+    
+    // Update on window resize
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+            updateCarousel();
+        }, 250);
+    });
+}
+
+// Initialize both carousels
+document.addEventListener('DOMContentLoaded', () => {
+    initCarousel('carousel-shots');
+    initCarousel('carousel-singer');
+    initCarousel('carousel-podcast');
+    initCarousel('carousel-sales');
+    initCarousel('carousel-multiperson');
+});
+
+        </script>
+    <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"944e28ba3a2961e3","version":"2025.4.0-1-g37f21b1","r":1,"token":"8591086b57754c278d4db02301f960eb","serverTiming":{"name":{"cfExtPri":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}}}' crossorigin="anonymous"></script>
+</body>
+</html>
