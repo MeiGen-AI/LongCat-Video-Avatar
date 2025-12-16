@@ -1,7 +1,7 @@
 # LongCat-Video-Avatar 
 
 <div align="center">
-  <img src="assets/longcat-video_logo.svg" width="45%" alt="LongCat-Video-Avatar" />
+  <img src="assets/icons/longcat-video-avatar_logo.svg" width="45%" alt="LongCat-Video-Avatar" />
 </div>
 <hr>
 
