@@ -1446,19 +1446,6 @@
 
         <div class="carousel-wrapper">
             <div class="carousel-track">
-                <div class="carousel-item" data-caption="<span style='color: #3498db; font-weight: bold;'>[ATI2V]</span> A woman with wavy brown hair in a cozy cream sweater sits on a plush sofa, her hands moving gently as 
-                                she speaks. Warm light from a floor lamp glows beside a vase of fresh flowers, casting soft shadows 
-                                in a serene living room with flowing neutral curtains.">
-                    <div class="video-player audio-control">
-                        <video loop playsinline preload="none" muted src="videos/podcast2/podcast_1.mp4"></video>
-                    </div>
-                </div>
-                <div class="carousel-item" data-caption="<span style='color: #3498db; font-weight: bold;'>[ATI2V]</span> A woman with brown hair in a white sleeveless top speaks into a studio microphone, her hands gesturing gently.
-                                Shelves with plants and framed photos line the warmly lit, cozy background. ">
-                    <div class="video-player audio-control">
-                        <video loop playsinline preload="none" muted src="videos/podcast2/podcast_2.mp4"></video>
-                    </div>
-                </div>
                 <div class="carousel-item" data-caption="<span style='color: #3498db; font-weight: bold;'>[ATI2V]</span> A focused man in a dark blue sweater sits before a microphone, preparing to speak. Warm light from a golden 
                                 lamp illuminates a backdrop of a wooden bookshelf and a leafy green plant, creating a cozy, professional podcast atmosphere. ">
                     <div class="video-player audio-control">
@@ -1469,6 +1456,19 @@
                                 lamp illuminates a backdrop of a wooden bookshelf and a leafy green plant, creating a cozy, professional podcast atmosphere. ">
                     <div class="video-player audio-control">
                         <video loop playsinline preload="none" muted src="videos/podcast2/podcast_4.mp4"></video>
+                    </div>
+                </div>
+                <div class="carousel-item" data-caption="<span style='color: #3498db; font-weight: bold;'>[ATI2V]</span> A woman with brown hair in a white sleeveless top speaks into a studio microphone, her hands gesturing gently.
+                                Shelves with plants and framed photos line the warmly lit, cozy background. ">
+                    <div class="video-player audio-control">
+                        <video loop playsinline preload="none" muted src="videos/podcast2/podcast_2.mp4"></video>
+                    </div>
+                </div>
+                <div class="carousel-item" data-caption="<span style='color: #3498db; font-weight: bold;'>[ATI2V]</span> A woman with wavy brown hair in a cozy cream sweater sits on a plush sofa, her hands moving gently as 
+                                she speaks. Warm light from a floor lamp glows beside a vase of fresh flowers, casting soft shadows 
+                                in a serene living room with flowing neutral curtains.">
+                    <div class="video-player audio-control">
+                        <video loop playsinline preload="none" muted src="videos/podcast2/podcast_1.mp4"></video>
                     </div>
                 </div>
                 <div class="carousel-item" data-caption="<span style='color: #3498db; font-weight: bold;'>[ATI2V]</span> A man in a blue denim jacket speaks thoughtfully into a black studio microphone, 
@@ -1632,6 +1632,36 @@
     <!-- <div class="carousel-caption"></div> -->
     <div class="audio-button audio-button-mobile"></div>
 </section>
+
+
+<section id="longvideo">
+    <div class="text">
+        <h1> Long Video Generation</h1>
+        Support long video generation with stable lip synchronization, consistent identity, and unnoticeable color tone accumulation. Here is a 5-minute example. 
+    </div>
+    <div class="carousel-container" id="carousel-longvideo">
+        <button class="carousel-nav prev">‹</button>
+        <div class="carousel-wrapper">
+            <div class="carousel-track">
+                <div class="carousel-item" data-caption="<span style='color: #3498db; font-weight: bold;'>[ATI2V]</span> A woman with wavy brown hair in a cozy cream sweater sits on a plush sofa, her hands moving gently as 
+                                she speaks. Warm light from a floor lamp glows beside a vase of fresh flowers, casting soft shadows 
+                                in a serene living room with flowing neutral curtains.">
+                    <div class="video-player audio-control">
+                        <video loop playsinline preload="none" muted src="videos/5min/720_5min_compressed.mp4"></video>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <button class="carousel-nav next">›</button>
+        <div class="carousel-caption"></div>
+
+        <div class="carousel-dots"></div>
+    </div>
+    <!-- <div class="carousel-caption"></div> -->
+    <div class="audio-button audio-button-mobile"></div>
+</section>
+
+
 
 
 
@@ -2223,6 +2253,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initCarousel('carousel-podcast');
     initCarousel('carousel-sales');
     initCarousel('carousel-multiperson');
+    initCarousel('carousel-longvideo');
 });
 
         </script>
